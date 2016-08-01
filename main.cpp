@@ -25,6 +25,12 @@ using namespace cv;
 const char *windowDisparity = "Disparity";
 const char *inputPath = "../input_file/";
 
+VideoCapture cap0(0);
+VideoCapture cap1(1);
+
+string leftFile, rightFile;
+
+/*
 boost::shared_ptr<pcl::visualization::PCLVisualizer> createVisualizer (pcl::PointCloud<pcl::PointXYZRGB>::ConstPtr cloud)
 {
   boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
@@ -54,6 +60,7 @@ bool loadQMatrix(string file, Mat &Q)
 
     return success;
 }
+
 
 void createAndSavePointCloud(Mat &disparity, Mat &leftImage, Mat &Q, string filename)
 {
@@ -102,7 +109,7 @@ void createAndSavePointCloud(Mat &disparity, Mat &leftImage, Mat &Q, string file
     pointCloud.height = 1;
     pcl::io::savePCDFileASCII(filename, pointCloud);
 }
-
+*/
 
 
 
@@ -111,9 +118,14 @@ int main(int argc, char *argv[])
     VideoCapture cap0(0);
     VideoCapture cap1(1);
 
+    Mat Size( 240, 320, CV_8U);
+
     Mat frame0, frame1;
+    Mat resize0, resize1;
     Mat blur0, blur1;
     Mat mix0, mix1;
+
+    Mat imgDisparity8U;
 
 /*
     string intrFile, extrFile;
@@ -155,6 +167,37 @@ int main(int argc, char *argv[])
     initUndistortRectifyMap(M2, D2, R2, P2, img_size, CV_16SC2, map21, map22);
 */
 
+    if( argv[1][0] == '0')
+    {
+	if( !cap0.isOpened() || !cap1.isOpened())
+	{
+	    cout<<"Cannot open cammera"<<endl;
+	    return -1;
+	}
+
+	cap0>>frame0;
+	cap1>>frame1;
+    }
+    else if( argv[1][0] == '1')
+    {
+	leftFile += inputPath;
+	leftFile += argv[2];
+
+	rightFile += inputPath;
+	rightFile += argv[3];	
+
+	frame0 = imread( leftFile, CV_LOAD_IMAGE_COLOR);
+	frame1 = imread( rightFile, CV_LOAD_IMAGE_COLOR);
+    }
+    else
+    {
+	leftFile += inputPath;
+	leftFile += argv[2];
+
+	rightFile += inputPath;
+	rightFile += argv[3];	
+    }
+
     int minDisparity = 55;
     int numDisparities = 8;
     int SADWindowSize = 5;
@@ -169,113 +212,193 @@ int main(int argc, char *argv[])
     bool fullDP = true;
     int a = 5, b = 10, c = 2;
 
-    Mat imgDisparity8U;
+    namedWindow("Control", CV_WINDOW_AUTOSIZE);
+    createTrackbar("lowThreshold", "Control", &lowThreshold, 300);
+    createTrackbar("minDisparity( -64 ~ 64 )", "Control", &minDisparity, 128);
+    createTrackbar("numDisparities( 0 ~ 240 )", "Control", &numDisparities, 15);
+    createTrackbar("SADWindowSize( 1 ~ 31 )", "Control", &SADWindowSize, 150);
+    createTrackbar("P1", "Control", &Pi1, 10000);
+    createTrackbar("P2", "Control", &Pi2, 10000);
+    createTrackbar("disp12MaxDiff", "Control", &disp12MaxDiff, 20);
+    createTrackbar("preFilterCap", "Control", &preFilterCap, 10);
+    createTrackbar("uniquenessRatio", "Control", &uniquenessRatio, 10);
+    createTrackbar("speckleWindowSize", "Control", &speckleWindowSize, 255);
+    createTrackbar("speckleRange", "Control", &speckleRange, 99);
+    createTrackbar("a", "Control", &a, 20);
+    createTrackbar("b", "Control", &b, 100);
+    createTrackbar("c", "Control", &c, 10);
 
-    if( !(argv[1] == NULL))
+    
+    if( argv[1][0] == '0')
     {
-	string leftFile;
-	leftFile += inputPath;
-	leftFile += argv[1];
-
-	string rightFile;
-	rightFile += inputPath;
-	rightFile += argv[2];	
-
-	frame0 = imread( leftFile, CV_LOAD_IMAGE_COLOR);
-	frame1 = imread( rightFile, CV_LOAD_IMAGE_COLOR);
-    }
-    else
-    {
-	if( !cap0.isOpened() || !cap1.isOpened())
-	{
-	    cout<<"Cannot open cammera"<<endl;
-	    return -1;
-	}
-
-	cap0>>frame0;
-	cap1>>frame1;
-    }
-
-    while(1)
-    {
-	if( argv[1] == NULL)
+	while(1)
 	{
 	    cap0>>frame0;
 	    cap1>>frame1;
-	}
-	else
-	    ;
+
+	    frame0.convertTo( frame0, CV_8U);
+	    frame1.convertTo( frame1, CV_8U);
+
+	    resize( frame0, resize0, Size.size());
+	    resize( frame1, resize1, Size.size());
 	
-	frame0.convertTo( frame0, CV_8U);
-	frame1.convertTo( frame1, CV_8U);
+	    bilateralFilter( resize0, blur0, a, b, c);
+	    bilateralFilter( resize1, blur1, a, b, c);
 
-	namedWindow("Control", CV_WINDOW_AUTOSIZE);
-	createTrackbar("lowThreshold", "Control", &lowThreshold, 300);
-	createTrackbar("minDisparity( -64 ~ 64 )", "Control", &minDisparity, 128);
-	createTrackbar("numDisparities( 0 ~ 240 )", "Control", &numDisparities, 15);
-	createTrackbar("SADWindowSize( 1 ~ 31 )", "Control", &SADWindowSize, 150);
-	createTrackbar("P1", "Control", &Pi1, 10000);
-	createTrackbar("P2", "Control", &Pi2, 10000);
-	createTrackbar("disp12MaxDiff", "Control", &disp12MaxDiff, 20);
-	createTrackbar("preFilterCap", "Control", &preFilterCap, 10);
-	createTrackbar("uniquenessRatio", "Control", &uniquenessRatio, 10);
-	createTrackbar("speckleWindowSize", "Control", &speckleWindowSize, 255);
-	createTrackbar("speckleRange", "Control", &speckleRange, 99);
-	createTrackbar("a", "Control", &a, 20);
-	createTrackbar("b", "Control", &b, 100);
-	createTrackbar("c", "Control", &c, 10);
+	    addWeighted( resize0, 1.9, blur0, -1, 0, mix0);
+	    addWeighted( resize1, 1.9, blur1, -1, 0, mix1);
+
+	    imshow("left", mix0);
+	    imshow("right", mix1);
+
+	    Mat imgDisparity16S = Mat( resize1.rows, resize1.cols, CV_8U);
+	    imgDisparity8U = Mat( resize1.rows, resize1.cols, CV_8U);
+
+	    Ptr<StereoSGBM> sbm = StereoSGBM::create( minDisparity - 64, 16*numDisparities, 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
+	    sbm->setMode(StereoSGBM::MODE_HH);
+	    sbm->compute( mix0, mix1, imgDisparity16S);
 	
-	bilateralFilter( frame0, blur0, a, b, c);
-	bilateralFilter( frame1, blur1, a, b, c);
+	    double minVal; double maxVal;
 
-	addWeighted( frame0, 1.9, blur0, -1, 0, mix0);
-	addWeighted( frame1, 1.9, blur1, -1, 0, mix1);
-
-	imshow("left", mix0);
-	imshow("right", mix1);
-
-	Mat imgDisparity16S = Mat( frame1.rows, frame1.cols, CV_8U);
-	imgDisparity8U = Mat( frame1.rows, frame1.cols, CV_8U);
-
-	Ptr<StereoSGBM> sbm = StereoSGBM::create( minDisparity - 64, 16*numDisparities, 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
-	sbm->setMode(StereoSGBM::MODE_HH);
-	sbm->compute( mix0, mix1, imgDisparity16S);
+	    minMaxLoc( imgDisparity16S, &minVal, &maxVal);
 	
-	double minVal; double maxVal;
+	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	minMaxLoc( imgDisparity16S, &minVal, &maxVal);
-	cout<<minVal<<" "<<maxVal;
+	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
 
-	printf("Min disp: %f Max value: %f \n", minVal, maxVal);
+	    Mat cutRefine;
+	    cutRefine = imgDisparity8U.colRange( 16*numDisparities, resize1.cols + minDisparity - 64);
 
-	imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+	    namedWindow( windowDisparity, WINDOW_NORMAL);
+	    imshow( windowDisparity, cutRefine );
 
-	Mat cutRefine;
-	cutRefine = imgDisparity8U.colRange( 16*numDisparities, frame1.cols + minDisparity - 64);
+	    imwrite("result/disparity.jpg", cutRefine);
 
-	namedWindow( windowDisparity, WINDOW_NORMAL);
-	imshow( windowDisparity, cutRefine );
+	    string dispFile;
+	    dispFile += "result/disp.yml";
+	    FileStorage data( dispFile, FileStorage::WRITE);
+	    data<<"disp"<<cutRefine;
+	    data.release();
+/*
+	    stringstream file;
+	    Mat Q(3, 3, CV_64F);
+	    loadQMatrix("../input_file/extrinsics.yml", Q);
+	    file << "result/_cloud.pcd";
+	    createAndSavePointCloud( cutRefine, frame0, Q, file.str());
+*/
+	    waitKey(1);
+        }
+    }
+	
+    else if( argv[1][0] == '1')
+    {
+	while(1)
+	{
+	    frame0.convertTo( frame0, CV_8U);
+	    frame1.convertTo( frame1, CV_8U);
 
-	boost::filesystem::path dir("result/");
-	boost::filesystem::create_directories(dir);
+	    resize( frame0, resize0, Size.size());
+	    resize( frame1, resize1, Size.size());
+	
+	    bilateralFilter( resize0, blur0, a, b, c);
+	    bilateralFilter( resize1, blur1, a, b, c);
 
-	imwrite("result/disparity.jpg", cutRefine);
+	    addWeighted( resize0, 1.9, blur0, -1, 0, mix0);
+	    addWeighted( resize1, 1.9, blur1, -1, 0, mix1);
 
-	string dispFile;
-	dispFile += "result/disp.yml";
-	FileStorage data( dispFile, FileStorage::WRITE);
-	data<<"disp"<<cutRefine;
-	data.release();
+	    imshow("left", mix0);
+	    imshow("right", mix1);
 
-	stringstream file;
-	Mat Q(3, 3, CV_64F);
-	loadQMatrix("../input_file/extrinsics.yml", Q);
-	file << "result/_cloud.pcd";
-	createAndSavePointCloud( cutRefine, frame0, Q, file.str());
+	    Mat imgDisparity16S = Mat( resize1.rows, resize1.cols, CV_8U);
+	    imgDisparity8U = Mat( resize1.rows, resize1.cols, CV_8U);
 
-	waitKey(200);
+	    Ptr<StereoSGBM> sbm = StereoSGBM::create( minDisparity - 64, 16*numDisparities, 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
+	    sbm->setMode(StereoSGBM::MODE_HH);
+	    sbm->compute( mix0, mix1, imgDisparity16S);
+	
+	    double minVal; double maxVal;
+
+	    minMaxLoc( imgDisparity16S, &minVal, &maxVal);
+	
+	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
+
+	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+
+	    Mat cutRefine;
+	    cutRefine = imgDisparity8U.colRange( 16*numDisparities, resize1.cols + minDisparity - 64);
+
+	    namedWindow( windowDisparity, WINDOW_NORMAL);
+	    imshow( windowDisparity, cutRefine );
+
+	    imwrite("result/disparity.jpg", cutRefine);
+
+	    string dispFile;
+	    dispFile += "result/disp.yml";
+	    FileStorage data( dispFile, FileStorage::WRITE);
+	    data<<"disp"<<cutRefine;
+	    data.release();
+
+	    waitKey(1);
+        }
     }
 
+    else
+    {
+	VideoCapture vid0(leftFile);
+	VideoCapture vid1(rightFile);
+
+	while(1)
+	{
+	    vid0>>frame0;
+	    vid1>>frame1;
+
+	    frame0.convertTo( frame0, CV_8U);
+	    frame1.convertTo( frame1, CV_8U);
+
+	    resize( frame0, resize0, Size.size());
+	    resize( frame1, resize1, Size.size());
+	
+	    bilateralFilter( resize0, blur0, a, b, c);
+	    bilateralFilter( resize1, blur1, a, b, c);
+
+	    addWeighted( resize0, 1.9, blur0, -1, 0, mix0);
+	    addWeighted( resize1, 1.9, blur1, -1, 0, mix1);
+
+	    imshow("left", mix0);
+	    imshow("right", mix1);
+
+	    Mat imgDisparity16S = Mat( resize1.rows, resize1.cols, CV_8U);
+	    imgDisparity8U = Mat( resize1.rows, resize1.cols, CV_8U);
+
+	    Ptr<StereoSGBM> sbm = StereoSGBM::create( minDisparity - 64, 16*numDisparities, 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
+	    sbm->setMode(StereoSGBM::MODE_HH);
+	    sbm->compute( mix0, mix1, imgDisparity16S);
+	
+	    double minVal; double maxVal;
+
+	    minMaxLoc( imgDisparity16S, &minVal, &maxVal);
+	
+	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
+
+	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+
+	    Mat cutRefine;
+	    cutRefine = imgDisparity8U.colRange( 16*numDisparities, resize1.cols + minDisparity - 64);
+
+	    namedWindow( windowDisparity, WINDOW_NORMAL);
+	    imshow( windowDisparity, cutRefine );
+
+	    imwrite("result/disparity.jpg", cutRefine);
+
+	    string dispFile;
+	    dispFile += "result/disp.yml";
+	    FileStorage data( dispFile, FileStorage::WRITE);
+	    data<<"disp"<<cutRefine;
+	    data.release();
+
+	    waitKey(1);
+        }
+    }    
 
 
 
