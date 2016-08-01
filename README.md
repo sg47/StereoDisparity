@@ -30,3 +30,4 @@ opencv2
 libconfig++
 boost
 pcl
+openmp
