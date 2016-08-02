@@ -25,8 +25,8 @@ using namespace cv;
 const char *windowDisparity = "Disparity";
 const char *inputPath = "../input_file/";
 
-VideoCapture cap0(0);
-VideoCapture cap1(1);
+//VideoCapture cap0(0);
+//VideoCapture cap1(1);
 
 string leftFile, rightFile;
 
@@ -115,10 +115,10 @@ void createAndSavePointCloud(Mat &disparity, Mat &leftImage, Mat &Q, string file
 
 int main(int argc, char *argv[])
 {
-    VideoCapture cap0(0);
-    VideoCapture cap1(1);
+    VideoCapture cap0(1);
+    VideoCapture cap1(0);
 
-    Mat Size( 240, 320, CV_8U);
+    Mat Size( 480, 640, CV_8U);
 
     Mat frame0, frame1;
     Mat resize0, resize1;
@@ -236,8 +236,8 @@ int main(int argc, char *argv[])
 	    cap0>>frame0;
 	    cap1>>frame1;
 
-	    frame0.convertTo( frame0, CV_8U);
-	    frame1.convertTo( frame1, CV_8U);
+	    //frame0.convertTo( frame0, CV_8U);
+	    //frame1.convertTo( frame1, CV_8U);
 
 	    resize( frame0, resize0, Size.size());
 	    resize( frame1, resize1, Size.size());
@@ -322,7 +322,7 @@ int main(int argc, char *argv[])
 	
 	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal), -minVal);
 
 	    Mat cutRefine;
 	    cutRefine = imgDisparity8U.colRange( 16*numDisparities, resize1.cols + minDisparity - 64);
