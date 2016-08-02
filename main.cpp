@@ -6,6 +6,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/cudastereo.hpp"
+#include "opencv2/ximgproc/disparity_filter.hpp"
 #include <libconfig.h++>
 #include <cstdlib>
 #include <boost/filesystem.hpp>
@@ -21,6 +22,7 @@
 #include <unistd.h>
 using namespace std;
 using namespace cv;
+using namespace cv::ximgproc;
 
 const char *windowDisparity = "Disparity";
 const char *inputPath = "../input_file/";
@@ -118,14 +120,14 @@ int main(int argc, char *argv[])
     VideoCapture cap0(1);
     VideoCapture cap1(0);
 
-    Mat Size( 480, 640, CV_8U);
+    Mat Size( 240, 320, CV_8U);
 
     Mat frame0, frame1;
     Mat resize0, resize1;
     Mat blur0, blur1;
     Mat mix0, mix1;
 
-    Mat imgDisparity8U;
+
 
 /*
     string intrFile, extrFile;
@@ -211,22 +213,27 @@ int main(int argc, char *argv[])
     int lowThreshold = 20;
     bool fullDP = true;
     int a = 5, b = 10, c = 2;
+    int lambda = 8000;
+    int sigma = 20;
 
-    namedWindow("Control", CV_WINDOW_AUTOSIZE);
-    createTrackbar("lowThreshold", "Control", &lowThreshold, 300);
-    createTrackbar("minDisparity( -64 ~ 64 )", "Control", &minDisparity, 128);
-    createTrackbar("numDisparities( 0 ~ 240 )", "Control", &numDisparities, 15);
-    createTrackbar("SADWindowSize( 1 ~ 31 )", "Control", &SADWindowSize, 150);
-    createTrackbar("P1", "Control", &Pi1, 10000);
-    createTrackbar("P2", "Control", &Pi2, 10000);
-    createTrackbar("disp12MaxDiff", "Control", &disp12MaxDiff, 20);
-    createTrackbar("preFilterCap", "Control", &preFilterCap, 10);
-    createTrackbar("uniquenessRatio", "Control", &uniquenessRatio, 10);
-    createTrackbar("speckleWindowSize", "Control", &speckleWindowSize, 255);
+    namedWindow("Control1", CV_WINDOW_AUTOSIZE);
+    namedWindow("Control2", CV_WINDOW_AUTOSIZE);
+    createTrackbar("lowThreshold", "Control1", &lowThreshold, 300);
+    createTrackbar("minDisparity( -64 ~ 0 )", "Control1", &minDisparity, 64);
+    createTrackbar("numDisparities( 16 ~ 240 )", "Control1", &numDisparities, 14);
+    createTrackbar("SADWindowSize( 1 ~ 31 )", "Control1", &SADWindowSize, 150);
+    createTrackbar("P1", "Control1", &Pi1, 10000);
+    createTrackbar("P2", "Control1", &Pi2, 10000);
+    createTrackbar("disp12MaxDiff", "Control1", &disp12MaxDiff, 100);
+    createTrackbar("preFilterCap", "Control1", &preFilterCap, 10);
+    createTrackbar("uniquenessRatio", "Control1", &uniquenessRatio, 10);
+    createTrackbar("speckleWindowSize", "Control1", &speckleWindowSize, 255);
     createTrackbar("speckleRange", "Control", &speckleRange, 99);
-    createTrackbar("a", "Control", &a, 20);
-    createTrackbar("b", "Control", &b, 100);
-    createTrackbar("c", "Control", &c, 10);
+    createTrackbar("a", "Control2", &a, 20);
+    createTrackbar("b", "Control2", &b, 100);
+    createTrackbar("c", "Control2", &c, 10);
+    createTrackbar("lambda", "Control2", &lambda, 10000);
+    createTrackbar("sigma( 0.0 ~ 2 )", "Control2", &sigma, 30);
 
     
     if( argv[1][0] == '0')
@@ -236,8 +243,8 @@ int main(int argc, char *argv[])
 	    cap0>>frame0;
 	    cap1>>frame1;
 
-	    //frame0.convertTo( frame0, CV_8U);
-	    //frame1.convertTo( frame1, CV_8U);
+	    frame0.convertTo( frame0, CV_8U);
+	    frame1.convertTo( frame1, CV_8U);
 
 	    resize( frame0, resize0, Size.size());
 	    resize( frame1, resize1, Size.size());
@@ -251,23 +258,32 @@ int main(int argc, char *argv[])
 	    imshow("left", mix0);
 	    imshow("right", mix1);
 
-	    Mat imgDisparity16S = Mat( resize1.rows, resize1.cols, CV_8U);
-	    imgDisparity8U = Mat( resize1.rows, resize1.cols, CV_8U);
+	    Mat left_disp, right_disp;
+	    Mat filtered_disp;
+	    Mat imgDisparity8U;
 
-	    Ptr<StereoSGBM> sbm = StereoSGBM::create( minDisparity - 64, 16*numDisparities, 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
-	    sbm->setMode(StereoSGBM::MODE_HH);
-	    sbm->compute( mix0, mix1, imgDisparity16S);
+	    Ptr<StereoSGBM> left_matcher = StereoSGBM::create( minDisparity - 64, 16*(numDisparities+1), 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
+	    left_matcher->setMode(StereoSGBM::MODE_HH);
+	    Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(left_matcher);
+	    Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
+
+	    left_matcher->compute( mix0, mix1, left_disp);
+	    right_matcher->compute( mix1, mix0, right_disp);
+
+	    wls_filter->setLambda(lambda);
+	    wls_filter->setSigmaColor(sigma/10);
+	    wls_filter->filter(left_disp, resize0, filtered_disp, right_disp);
 	
 	    double minVal; double maxVal;
 
-	    minMaxLoc( imgDisparity16S, &minVal, &maxVal);
+	    minMaxLoc( filtered_disp, &minVal, &maxVal);
 	
 	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+	    filtered_disp.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
 
 	    Mat cutRefine;
-	    cutRefine = imgDisparity8U.colRange( 16*numDisparities, resize1.cols + minDisparity - 64);
+	    cutRefine = imgDisparity8U.colRange( 16*(numDisparities+1), resize1.cols + minDisparity - 64);
 
 	    namedWindow( windowDisparity, WINDOW_NORMAL);
 	    imshow( windowDisparity, cutRefine );
@@ -309,23 +325,32 @@ int main(int argc, char *argv[])
 	    imshow("left", mix0);
 	    imshow("right", mix1);
 
-	    Mat imgDisparity16S = Mat( resize1.rows, resize1.cols, CV_8U);
-	    imgDisparity8U = Mat( resize1.rows, resize1.cols, CV_8U);
+	    Mat left_disp, right_disp;
+	    Mat filtered_disp;
+	    Mat imgDisparity8U;
 
-	    Ptr<StereoSGBM> sbm = StereoSGBM::create( minDisparity - 64, 16*numDisparities, 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
-	    sbm->setMode(StereoSGBM::MODE_HH);
-	    sbm->compute( mix0, mix1, imgDisparity16S);
+	    Ptr<StereoSGBM> left_matcher = StereoSGBM::create( minDisparity - 64, 16*(numDisparities+1), 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
+	    left_matcher->setMode(StereoSGBM::MODE_HH);
+	    Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(left_matcher);
+	    Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
+
+	    left_matcher->compute( mix0, mix1, left_disp);
+	    right_matcher->compute( mix1, mix0, right_disp);
+
+	    wls_filter->setLambda(lambda);
+	    wls_filter->setSigmaColor(sigma/10);
+	    wls_filter->filter(left_disp, resize0, filtered_disp, right_disp);
 	
 	    double minVal; double maxVal;
 
-	    minMaxLoc( imgDisparity16S, &minVal, &maxVal);
+	    minMaxLoc( filtered_disp, &minVal, &maxVal);
 	
 	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal), -minVal);
+	    filtered_disp.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
 
 	    Mat cutRefine;
-	    cutRefine = imgDisparity8U.colRange( 16*numDisparities, resize1.cols + minDisparity - 64);
+	    cutRefine = imgDisparity8U.colRange( 16*(numDisparities+1), resize1.cols + minDisparity - 64);
 
 	    namedWindow( windowDisparity, WINDOW_NORMAL);
 	    imshow( windowDisparity, cutRefine );
@@ -367,23 +392,32 @@ int main(int argc, char *argv[])
 	    imshow("left", mix0);
 	    imshow("right", mix1);
 
-	    Mat imgDisparity16S = Mat( resize1.rows, resize1.cols, CV_8U);
-	    imgDisparity8U = Mat( resize1.rows, resize1.cols, CV_8U);
+	    Mat left_disp, right_disp;
+	    Mat filtered_disp;
+	    Mat imgDisparity8U;
 
-	    Ptr<StereoSGBM> sbm = StereoSGBM::create( minDisparity - 64, 16*numDisparities, 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
-	    sbm->setMode(StereoSGBM::MODE_HH);
-	    sbm->compute( mix0, mix1, imgDisparity16S);
+	    Ptr<StereoSGBM> left_matcher = StereoSGBM::create( minDisparity - 64, 16*(numDisparities+1), 2*SADWindowSize + 1, Pi1, Pi2, disp12MaxDiff, preFilterCap, uniquenessRatio, speckleWindowSize, speckleRange, fullDP);
+	    left_matcher->setMode(StereoSGBM::MODE_HH);
+	    Ptr<DisparityWLSFilter> wls_filter = createDisparityWLSFilter(left_matcher);
+	    Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
+
+	    left_matcher->compute( mix0, mix1, left_disp);
+	    right_matcher->compute( mix1, mix0, right_disp);
+
+	    wls_filter->setLambda(lambda);
+	    wls_filter->setSigmaColor(sigma/10);
+	    wls_filter->filter(left_disp, resize0, filtered_disp, right_disp);
 	
 	    double minVal; double maxVal;
 
-	    minMaxLoc( imgDisparity16S, &minVal, &maxVal);
+	    minMaxLoc( filtered_disp, &minVal, &maxVal);
 	
 	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	    imgDisparity16S.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+	    filtered_disp.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
 
 	    Mat cutRefine;
-	    cutRefine = imgDisparity8U.colRange( 16*numDisparities, resize1.cols + minDisparity - 64);
+	    cutRefine = imgDisparity8U.colRange( 16*(numDisparities+1), resize1.cols + minDisparity - 64);
 
 	    namedWindow( windowDisparity, WINDOW_NORMAL);
 	    imshow( windowDisparity, cutRefine );

@@ -500,3 +500,4 @@ CMakeFiles/workspace.dir/main.cpp.o
  /usr/local/include/opencv2/videoio/videoio_c.h
  /usr/local/include/opencv2/xfeatures2d.hpp
  /usr/local/include/opencv2/xfeatures2d/nonfree.hpp
+ /usr/local/include/opencv2/ximgproc/disparity_filter.hpp

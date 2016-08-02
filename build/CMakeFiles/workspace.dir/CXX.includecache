@@ -23,6 +23,8 @@ opencv2/imgproc/imgproc.hpp
 /root/workspace/opencv2/imgproc/imgproc.hpp
 opencv2/cudastereo.hpp
 /root/workspace/opencv2/cudastereo.hpp
+opencv2/ximgproc/disparity_filter.hpp
+/root/workspace/opencv2/ximgproc/disparity_filter.hpp
 libconfig.h++
 -
 cstdlib
@@ -3605,4 +3607,10 @@ opencv2/xfeatures2d/nonfree.hpp
 /usr/local/include/opencv2/xfeatures2d/nonfree.hpp
 opencv2/features2d.hpp
 /usr/local/include/opencv2/xfeatures2d/opencv2/features2d.hpp
+
+/usr/local/include/opencv2/ximgproc/disparity_filter.hpp
+opencv2/core.hpp
+-
+opencv2/calib3d.hpp
+-
 
