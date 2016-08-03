@@ -117,8 +117,8 @@ void createAndSavePointCloud(Mat &disparity, Mat &leftImage, Mat &Q, string file
 
 int main(int argc, char *argv[])
 {
-    VideoCapture cap0(1);
-    VideoCapture cap1(0);
+    VideoCapture cap0(0);
+    VideoCapture cap1(1);
 
     Mat Size( 240, 320, CV_8U);
 
@@ -274,13 +274,25 @@ int main(int argc, char *argv[])
 	    wls_filter->setSigmaColor(sigma/10);
 	    wls_filter->filter(left_disp, resize0, filtered_disp, right_disp);
 	
-	    double minVal; double maxVal;
+	    double minVal; double maxVal; Mat mean; Mat stddev; int m, s;
 
 	    minMaxLoc( filtered_disp, &minVal, &maxVal);
-	
-	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	    filtered_disp.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+	    meanStdDev( filtered_disp, mean, stddev);
+
+	    m = mean.at<double>(0,0);
+	    s = stddev.at<double>(0,0);
+	
+	    printf("Min disp: %f Max value: %f mean: %f stddev: %f\n", minVal, maxVal, m, s);
+
+	    Mat thresH;
+	    threshold( filtered_disp, thresH, m + 1*s, m + s, THRESH_TRUNC);
+
+	    minMaxLoc( thresH, &minVal, &maxVal);
+
+	    printf("Min disp: %f Max value: %f mean: %f stddev: %f\n", minVal, maxVal, m, s);
+
+	    thresH.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
 
 	    Mat cutRefine;
 	    cutRefine = imgDisparity8U.colRange( 16*(numDisparities+1), resize1.cols + minDisparity - 64);
@@ -341,13 +353,21 @@ int main(int argc, char *argv[])
 	    wls_filter->setSigmaColor(sigma/10);
 	    wls_filter->filter(left_disp, resize0, filtered_disp, right_disp);
 	
-	    double minVal; double maxVal;
+	    double minVal; double maxVal; Mat mean; Mat stddev; int m, s;
 
 	    minMaxLoc( filtered_disp, &minVal, &maxVal);
-	
-	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	    filtered_disp.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+	    meanStdDev( filtered_disp, mean, stddev);
+
+	    m = mean.at<double>(0,0);
+	    s = stddev.at<double>(0,0);
+	
+	    printf("Min disp: %f Max value: %f mean: %f stddev: %f\n", minVal, maxVal, m, s);
+
+	    Mat thresH;
+	    threshold( filtered_disp, thresH, m + 1*s, m + 1*s, THRESH_TRUNC);
+
+	    thresH.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
 
 	    Mat cutRefine;
 	    cutRefine = imgDisparity8U.colRange( 16*(numDisparities+1), resize1.cols + minDisparity - 64);
@@ -408,13 +428,25 @@ int main(int argc, char *argv[])
 	    wls_filter->setSigmaColor(sigma/10);
 	    wls_filter->filter(left_disp, resize0, filtered_disp, right_disp);
 	
-	    double minVal; double maxVal;
+	    double minVal; double maxVal; Mat mean; Mat stddev; int m, s;
 
 	    minMaxLoc( filtered_disp, &minVal, &maxVal);
-	
-	    printf("Min disp: %f Max value: %f \n", minVal, maxVal);
 
-	    filtered_disp.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
+	    meanStdDev( filtered_disp, mean, stddev);
+
+	    m = mean.at<double>(0,0);
+	    s = stddev.at<double>(0,0);
+	
+	    printf("Min disp: %f Max value: %f mean: %f stddev: %f\n", minVal, maxVal, m, s);
+
+	    Mat thresH;
+	    threshold( filtered_disp, thresH, m + 1*s, m + 1*s, THRESH_TRUNC);
+
+	    minMaxLoc( thresH, &minVal, &maxVal);
+
+	    printf("Min disp: %f Max value: %f mean: %f stddev: %f\n", minVal, maxVal, m, s);
+
+	    thresH.convertTo( imgDisparity8U, CV_8U, 255/(maxVal - minVal));
 
 	    Mat cutRefine;
 	    cutRefine = imgDisparity8U.colRange( 16*(numDisparities+1), resize1.cols + minDisparity - 64);

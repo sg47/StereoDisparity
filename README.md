@@ -31,3 +31,7 @@ libconfig++
 boost
 pcl
 openmp
+
+
+Ver.5
+加入標準差濾波
